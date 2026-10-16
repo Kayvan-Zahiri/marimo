@@ -15,6 +15,36 @@ HAS_DEPS = DependencyManager.ipython.has()
 
 
 @pytest.mark.skipif(not HAS_DEPS, reason="IPython not installed")
+def test_register_with_cached_display_module(monkeypatch: pytest.MonkeyPatch):
+    import importlib
+    import sys
+
+    import IPython
+
+    display_module = importlib.import_module("IPython.display")
+    old_display = display_module.display
+    old_update_display = display_module.update_display
+    # An interrupted package import can leave its loaded submodule cached.
+    monkeypatch.delattr(IPython, "display", raising=False)
+    assert sys.modules["IPython.display"] is display_module
+
+    unpatch = IPythonFormatter().register()
+    try:
+        assert display_module.display is not old_display
+        formatter = get_formatter(display_module.HTML("<b>recovered</b>"))
+        assert formatter is not None
+        assert formatter(display_module.HTML("<b>recovered</b>")) == (
+            "text/html",
+            "<b>recovered</b>",
+        )
+    finally:
+        unpatch()
+
+    assert display_module.display is old_display
+    assert display_module.update_display is old_update_display
+
+
+@pytest.mark.skipif(not HAS_DEPS, reason="IPython not installed")
 def test_register_html_display():
     from IPython.display import HTML
 

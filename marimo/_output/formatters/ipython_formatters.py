@@ -20,7 +20,8 @@ class IPythonFormatter(FormatterFactory):
         return "IPython"
 
     def register(self) -> Callable[[], None]:
-        import IPython.display  # type:ignore
+        import IPython  # type:ignore
+        from IPython import display as ipython_display  # type:ignore
 
         from marimo._output import formatting
         from marimo._runtime.output import _output
@@ -32,8 +33,8 @@ class IPythonFormatter(FormatterFactory):
             """Clear all stored display objects."""
             display_objects.clear()
 
-        old_display = IPython.display.display
-        old_update_display = getattr(IPython.display, "update_display", None)
+        old_display = ipython_display.display
+        old_update_display = getattr(ipython_display, "update_display", None)
 
         # DisplayHandle class to match IPython's API
         class DisplayHandle:
@@ -43,7 +44,7 @@ class IPythonFormatter(FormatterFactory):
             def update(self, obj: Any, **kwargs: Any) -> None:
                 update_display(obj, display_id=self.display_id, **kwargs)
 
-        # Monkey patch IPython.display.display, which imperatively writes
+        # Monkey patch ipython_display.display, which imperatively writes
         # outputs to the frontend
         @functools.wraps(old_display)
         def display(*objs: Any, **kwargs: Any) -> DisplayHandle | None:
@@ -104,8 +105,8 @@ class IPythonFormatter(FormatterFactory):
             _output.replace(display_objects[display_id])
 
         # Patch both display and update_display
-        IPython.display.display = display
-        IPython.display.update_display = update_display
+        ipython_display.display = display
+        ipython_display.update_display = update_display
 
         # Patching display_functions handles display_markdown, display_x, etc.
         try:
@@ -116,11 +117,11 @@ class IPythonFormatter(FormatterFactory):
 
         def unpatch() -> None:
             clear_display_objects()  # Clean up on unpatch
-            IPython.display.display = old_display  # type: ignore
+            ipython_display.display = old_display  # type: ignore
             if old_update_display is not None:
-                IPython.display.update_display = old_update_display  # type: ignore
+                ipython_display.update_display = old_update_display  # type: ignore
             else:
-                del IPython.display.update_display
+                del ipython_display.update_display
 
             try:
                 IPython.core.display_functions.display = old_display  # type: ignore
@@ -134,10 +135,10 @@ class IPythonFormatter(FormatterFactory):
                 pass
 
         @formatting.formatter(
-            IPython.display.HTML  # type:ignore
+            ipython_display.HTML  # type:ignore
         )
         def _format_html(
-            html: IPython.display.HTML,  # type:ignore
+            html: ipython_display.HTML,  # type:ignore
         ) -> tuple[KnownMimeType, str]:
             if html.url is not None:
                 # TODO(akshayka): resize iframe not working
@@ -152,10 +153,10 @@ class IPythonFormatter(FormatterFactory):
             return ("text/html", data)
 
         @formatting.formatter(
-            IPython.display.Image  # type:ignore
+            ipython_display.Image  # type:ignore
         )
         def _format_image(
-            img: IPython.display.Image,  # type:ignore
+            img: ipython_display.Image,  # type:ignore
         ) -> tuple[KnownMimeType, str]:
             if img.data is not None:
                 mime_type = img._MIMETYPES.get(
